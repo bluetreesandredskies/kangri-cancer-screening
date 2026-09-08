@@ -1,8 +1,15 @@
 """
-Splits the raw ISIC downloads into a torchvision ImageFolder-style layout.
+Splits the raw downloads into a torchvision ImageFolder-style layout.
 
-Assumes isic-cli has already dumped images + json sidecars into:
-    data/raw/<class_name>/*.jpg
+Assumes images have already been placed into:
+    data/raw/<class_name>/*.jpg   (+ optional .json metadata sidecars)
+
+Class names are NOT hardcoded — this script just lists whatever
+subdirectories exist under data/raw/ and sorts them alphabetically. That
+alphabetical order becomes the label order for the whole project, and gets
+written out to data/processed/class_names.json so training/eval/backend code
+can all agree on it without re-deriving it. Add or remove a class folder
+under data/raw/ and this script picks it up automatically — no edits needed.
 
 Run from the repo root, e.g.:
     python data/prepare_dataset.py
@@ -10,6 +17,7 @@ Run from the repo root, e.g.:
 """
 
 import argparse
+import json
 import random
 import sys
 from pathlib import Path
@@ -24,21 +32,21 @@ TRAIN_FRAC = 0.70
 VAL_FRAC = 0.15
 TEST_FRAC = 0.15
 
-CLASS_NAMES = [
-    "squamous_cell_carcinoma",
-    "actinic_keratosis",
-    "nevus",
-    "seborrheic_keratosis",
-]
-
 RAW_DIR = Path("data/raw")
 PROCESSED_DIR = Path("data/processed")
 
 
+def discover_class_names(raw_dir: Path):
+    """Any subdirectory of data/raw/ is treated as a class. Sorted
+    alphabetically so the label order is deterministic and reproducible."""
+    class_dirs = [p for p in raw_dir.iterdir() if p.is_dir()]
+    return sorted(p.name for p in class_dirs)
+
+
 def find_images_for_class(class_dir: Path):
-    """Grab every jpg/jpeg/png in a class folder. We only care about the
-    image files here — the matching .json metadata from isic-cli is ignored
-    for this stage, it's not needed to build the ImageFolder split."""
+    """Grab every jpg/jpeg/png in a class folder. Matching .json metadata
+    sidecars (from isic-cli, or any other source) are ignored here — they're
+    not needed to build the ImageFolder split."""
     exts = ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG")
     files = []
     for ext in exts:
@@ -69,7 +77,7 @@ def split_paths(paths, seed=SPLIT_SEED):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Prepare ISIC images into train/val/test folders.")
+    parser = argparse.ArgumentParser(description="Prepare raw images into train/val/test folders.")
     parser.add_argument(
         "--max-per-class",
         type=int,
@@ -79,16 +87,18 @@ def main():
     args = parser.parse_args()
 
     if not RAW_DIR.exists():
-        sys.exit(f"Could not find {RAW_DIR}/ — did you run the isic-cli download step first?")
+        sys.exit(f"Could not find {RAW_DIR}/ — did you run the download step first?")
+
+    class_names = discover_class_names(RAW_DIR)
+    if not class_names:
+        sys.exit(f"No class subfolders found under {RAW_DIR}/ — nothing to do.")
+
+    print(f"Discovered {len(class_names)} class(es) under {RAW_DIR}: {class_names}")
 
     summary_rows = []
 
-    for class_name in CLASS_NAMES:
+    for class_name in class_names:
         class_dir = RAW_DIR / class_name
-        if not class_dir.exists():
-            print(f"[warn] {class_dir} does not exist, skipping this class.")
-            continue
-
         image_paths = find_images_for_class(class_dir)
 
         if not image_paths:
@@ -128,7 +138,24 @@ def main():
             }
         )
 
+    write_class_names_file(summary_rows)
     print_summary(summary_rows)
+
+
+def write_class_names_file(rows):
+    """Writes the alphabetical class order out so later scripts (training,
+    eval, the backend) can all agree on label indices without having to
+    re-derive them from folder listings themselves."""
+    if not rows:
+        return
+
+    ordered_names = [row["class"] for row in rows]
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = PROCESSED_DIR / "class_names.json"
+    with open(out_path, "w") as f:
+        json.dump(ordered_names, f, indent=2)
+
+    print(f"\nWrote class order to {out_path}")
 
 
 def print_summary(rows):
