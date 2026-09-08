@@ -3,3 +3,11 @@ data/raw/
 data/processed/
 venv/
 
+
+data_processed.zip
+data/processed.zip
+data/processed/
+__pycache__/
+*.pyc
+model/checkpoints/*.pt
+

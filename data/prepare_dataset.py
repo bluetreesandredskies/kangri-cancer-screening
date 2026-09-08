@@ -44,13 +44,35 @@ def discover_class_names(raw_dir: Path):
 
 
 def find_images_for_class(class_dir: Path):
-    """Grab every jpg/jpeg/png in a class folder. Matching .json metadata
-    sidecars (from isic-cli, or any other source) are ignored here — they're
-    not needed to build the ImageFolder split."""
-    exts = ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG")
+    """Grab every jpg/jpeg/png in a class folder, once each.
+
+    Uses a manual case-insensitive suffix check + dedupe-by-resolved-path,
+    instead of combining separate lowercase and uppercase glob patterns
+    (e.g. "*.jpg" AND "*.JPG"). On case-insensitive filesystems — which
+    includes Windows, and default macOS — those two patterns match the exact
+    same files, so combining them would silently return every image twice.
+    That double-counting doesn't just waste disk/CPU: since the train/val/test
+    split below is randomized, the two duplicate entries for the same image
+    could land in *different* splits, meaning the same photo could end up in
+    both the training set and the test set — invisibly leaking training data
+    into evaluation and inflating the reported accuracy/F1 numbers. This
+    version is safe on both Windows and Colab's Linux, so no platform-specific
+    handling is needed.
+
+    Non-image files that sit alongside the images in a class folder (e.g. an
+    isic-cli "attribution" text file, or a "licenses" subfolder) are ignored
+    automatically, since they don't have a .jpg/.jpeg/.png suffix and/or
+    aren't files at all.
+    """
+    valid_suffixes = {".jpg", ".jpeg", ".png"}
+    seen = set()
     files = []
-    for ext in exts:
-        files.extend(class_dir.glob(ext))
+    for p in class_dir.iterdir():
+        if p.is_file() and p.suffix.lower() in valid_suffixes:
+            resolved = p.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                files.append(p)
     return sorted(files)
 
 

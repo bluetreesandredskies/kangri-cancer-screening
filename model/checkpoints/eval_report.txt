@@ -1,0 +1,25 @@
+Evaluation on test set (1817 images)
+Checkpoint: D:\kangri-cancer-screening\model\checkpoints\best_model.pt (from epoch 12, val macro-F1 0.8219)
+Class order: ['actinic_keratosis', 'healthy', 'nevus', 'seborrheic_keratosis', 'squamous_cell_carcinoma']
+
+Classification report:
+                         precision    recall  f1-score   support
+
+      actinic_keratosis       0.69      0.74      0.72       426
+                healthy       0.67      0.93      0.78        15
+                  nevus       0.98      0.97      0.97       300
+   seborrheic_keratosis       0.81      0.80      0.80       616
+squamous_cell_carcinoma       0.73      0.70      0.72       460
+
+               accuracy                           0.79      1817
+              macro avg       0.78      0.83      0.80      1817
+           weighted avg       0.79      0.79      0.79      1817
+
+
+Confusion matrix (rows = true label, cols = predicted label):
+                    actinic_ke    healthy      nevus seborrheic squamous_c
+ actinic_keratosis         316          4          0         49         57
+           healthy           0         14          0          1          0
+             nevus           0          0        290          9          1
+seborrheic_keratos          63          1          4        490         58
+squamous_cell_carc          76          2          3         58        321
