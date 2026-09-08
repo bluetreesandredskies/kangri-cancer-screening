@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      # Context is the repo root, not backend/, because backend/Dockerfile
+      # copies the whole repo (it needs model/model_def.py and
+      # model/checkpoints/best_model.pt alongside backend/).
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      # The browser (running on the host) loads this bundle and calls the
+      # backend directly, so "localhost:8000" refers to the host's mapped
+      # port above — not the frontend container's own network namespace.
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
